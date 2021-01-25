@@ -8,7 +8,7 @@ import (
 	"monkeylang/token"
 )
 
-const PROMPT = ">> "
+const PROMPT = "☄ | "
 
 // Start - read from input source until you find a newline
 // take the line, pass it to a lexer instance, print all tokens lexer returns until EOF
