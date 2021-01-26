@@ -13,3 +13,7 @@ We initialize the lexer with our source code and repeatedly call next token to g
 - `NextToken()` is used to iterate through the source code
 
 Started with creating a lexer test, so we have a sense of what we need to achieve (TDD)
+
+### Parser
+
+Takes in input data, and builds a data structure (AST in our case). The goal here is to give structure to the otherwise meaningless input. Here, the parser is the equivalent of `JSON.parse()` in js for json objects
