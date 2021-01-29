@@ -8,15 +8,16 @@ type Node interface {
 	TokenLiteral() string // used for debugging
 }
 
+// Statement - do not produce values
 type Statement interface {
 	Node
 	statementNode()
 }
 
 type LetStatement struct {
-	Token token.Token
-	Name  *Identifier
-	Value Expression
+	Token token.Token // token.LET type
+	Name  *Identifier // identifier
+	Value Expression  // expression that produces the value
 }
 
 func (ls *LetStatement) statementNode()       {}
@@ -30,12 +31,14 @@ type Identifier struct {
 func (i *Identifier) expressionNode()      {}
 func (i *Identifier) TokenLiteral() string { return i.Token.Literal }
 
+// Expression - return values
 type Expression interface {
 	Node
 	expressionNode()
 }
 
 // Program - root node of every AST
+// A program contains an array of connected nodes
 type Program struct {
 	Statements []Statement
 }

@@ -17,3 +17,10 @@ Started with creating a lexer test, so we have a sense of what we need to achiev
 ### Parser
 
 Takes in input data, and builds a data structure (AST in our case). The goal here is to give structure to the otherwise meaningless input. Here, the parser is the equivalent of `JSON.parse()` in js for json objects
+
+
+### Recursive descent parsing
+- `parseProgram` - entrypoint
+- constructs root node of te AST (`newProgramASTNode()`)
+- Builds child nodes, statements etc
+- parseExpression - recursive portion
