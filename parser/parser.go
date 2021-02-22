@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"fmt"
 	"monkeylang/ast"
 	"monkeylang/lexer"
 	"monkeylang/token"
@@ -14,15 +15,22 @@ type Parser struct {
 	l         *lexer.Lexer
 	curToken  token.Token
 	peekToken token.Token
+	errors    []string
 }
 
 // New - create a new parser
 func New(l *lexer.Lexer) *Parser {
-	p := &Parser{l: l}
+	p := &Parser{l: l,
+		errors: []string(),
+	}
 	// read two tokens - prepopulate curToken and peekToken
 	p.nextToken()
 	p.nextToken()
 	return p
+}
+
+func (p *Parser) Errors() []string {
+	return p.errors
 }
 
 func (p *Parser) nextToken() {
@@ -55,13 +63,16 @@ func (p *Parser) parseStatement() ast.Statement {
 }
 
 func (p *Parser) parseLetStatement() *ast.LetStatement {
+	// construct a let statement ast node
 	stmt := &ast.LetStatement{Token: p.curToken}
 
+	// assert an identifier, and construct one right below
 	if !p.expectPeek(token.IDENT) {
 		return nil
 	}
 
 	stmt.Name = &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	// assert an assignment
 	if !p.expectPeek(token.ASSIGN) {
 		return nil
 	}
@@ -74,14 +85,17 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	return stmt
 }
 
+// assert a tokentype
 func (p *Parser) curTokenIs(t token.TokenType) bool {
 	return p.curToken.Type == t
 }
 
+// peek the next token
 func (p *Parser) peekTokenIs(t token.TokenType) bool {
 	return p.peekToken.Type == t
 }
 
+// enforce correctness of the order of tokens (by checking what token comes next)
 func (p *Parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
@@ -89,4 +103,10 @@ func (p *Parser) expectPeek(t token.TokenType) bool {
 	} else {
 		return false
 	}
+}
+
+// peekError - add an error to the errors slide (in the parser)
+func (p *Parser) peekError(t token.TokenType) {
+	msg := fmt.Sprintf("expected next token to be %s, got %s instead", t, p.peekToken.Type)
+	p.errors = append(p.errors, msg)
 }
