@@ -21,7 +21,7 @@ type Parser struct {
 // New - create a new parser
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{l: l,
-		errors: []string(),
+		errors: []string{},
 	}
 	// read two tokens - prepopulate curToken and peekToken
 	p.nextToken()
@@ -101,6 +101,7 @@ func (p *Parser) expectPeek(t token.TokenType) bool {
 		p.nextToken()
 		return true
 	} else {
+		p.peekError(t)
 		return false
 	}
 }
