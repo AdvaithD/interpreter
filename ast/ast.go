@@ -20,6 +20,14 @@ type LetStatement struct {
 	Value Expression  // expression that produces the value
 }
 
+type ReturnStatement struct {
+	Token       token.Token // return token
+	ReturnValue Expression  // expression to be returned
+}
+
+func (rs *ReturnStatement) statementNode()       {}
+func (rs *ReturnStatement) TokenLiteral() string { return rs.Token.Literal }
+
 func (ls *LetStatement) statementNode()       {}
 func (ls *LetStatement) TokenLiteral() string { return ls.Token.Literal }
 

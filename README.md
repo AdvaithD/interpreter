@@ -24,3 +24,7 @@ Takes in input data, and builds a data structure (AST in our case). The goal her
 - constructs root node of te AST (`newProgramASTNode()`)
 - Builds child nodes, statements etc
 - parseExpression - recursive portion
+
+#### Misc
+
+- The syntax consists of let statements, return statements and expressions. Pretty cool perspective to think from.
