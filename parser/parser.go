@@ -7,15 +7,34 @@ import (
 	"monkeylang/token"
 )
 
+type (
+	prefixParseFn func() ast.Expression
+	infixParseFn  func(ast.Expression) ast.Expression
+)
+
 // Parser - l curToken and peekToken
 // l - lexer instance
 // curToken & peekToken - pointers similar to position
 // and readPosition on the lexer
 type Parser struct {
-	l         *lexer.Lexer
+	l      *lexer.Lexer
+	errors []string
+
 	curToken  token.Token
 	peekToken token.Token
-	errors    []string
+
+	prefixParseFns map[token.TokenType]prefixParseFn // maps help if the right map has a parsing function associated with curToken.Type
+	infixParseFns  map[token.TokenType]infixParseFn
+}
+
+// register a prefix parse function
+func (p *Parser) registerPrefix(tokenType token.TokenType, fn prefixParseFn) {
+	p.prefixParseFns[tokenType] = fn
+}
+
+// register an infix parse function
+func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
+	p.infixParseFns[tokenType] = fn
 }
 
 // New - create a new parser
