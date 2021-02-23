@@ -7,6 +7,18 @@ import (
 	"monkeylang/token"
 )
 
+const (
+	_ int = iota
+	LOWEST
+	EQUALS      // ==
+	LESSGREATER // > or <
+	SUM         // +
+	PRODUCT     // *
+	PREFIX      // -X or !X
+	CALL        // myFunction(X)
+)
+
+// defined parser types with return type enforced
 type (
 	prefixParseFn func() ast.Expression
 	infixParseFn  func(ast.Expression) ast.Expression
@@ -16,6 +28,7 @@ type (
 // l - lexer instance
 // curToken & peekToken - pointers similar to position
 // and readPosition on the lexer
+// prefixParseFns and infixParseFns - mapping of helper parsers
 type Parser struct {
 	l      *lexer.Lexer
 	errors []string
@@ -42,16 +55,26 @@ func New(l *lexer.Lexer) *Parser {
 	p := &Parser{l: l,
 		errors: []string{},
 	}
+	// intitialize prefixparse map and register identifier parser
+	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
+	p.registerPrefix(token.IDENT, p.parseIdentifier)
 	// read two tokens - prepopulate curToken and peekToken
 	p.nextToken()
 	p.nextToken()
 	return p
 }
 
+// Errors - return errors in the parser
 func (p *Parser) Errors() []string {
 	return p.errors
 }
 
+// parseIdentifier - retrieve the identifier in ast expression format
+func (p *Parser) parseIdentifier() ast.Expression {
+	return &ast.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+}
+
+// nextToken - traverse to next token, adjust current and peek token references
 func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
@@ -72,6 +95,7 @@ func (p *Parser) ParseProgram() *ast.Program {
 	return program
 }
 
+// parseStatement - parse a statement
 func (p *Parser) parseStatement() ast.Statement {
 	switch p.curToken.Type {
 	case token.LET:
@@ -79,10 +103,22 @@ func (p *Parser) parseStatement() ast.Statement {
 	case token.RETURN:
 		return p.parseReturnStatement()
 	default:
-		return nil
+		return p.parseExpressionStatement()
 	}
 }
 
+// parseExpression - parse an expression, return AST expression
+func (p *Parser) parseExpression(precedence int) ast.Expression {
+	prefix := p.prefixParseFns[p.curToken.Type]
+	if prefix == nil {
+		return nil
+	}
+	leftExp := prefix()
+
+	return leftExp
+}
+
+// parseLetStatement - parse let statement
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	// construct a let statement ast node
 	stmt := &ast.LetStatement{Token: p.curToken}
@@ -106,6 +142,7 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 	return stmt
 }
 
+// parseReturnStatement - parse a return statement
 func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	stmt := &ast.ReturnStatement{Token: p.curToken}
 	p.nextToken()
@@ -118,17 +155,32 @@ func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
 	return stmt
 }
 
-// assert a tokentype
+// parseExpression -
+func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
+	// build an AST node
+	stmt := &ast.ExpressionStatement{Token: p.curToken}
+	// try to parse the expression
+	stmt.Expression = p.parseExpression(LOWEST)
+	// check for semicolon (optional, we want expressions to have optional semicolons)
+	// easier to interface from the REPL
+	if p.peekTokenIs(token.SEMICOLON) {
+		p.nextToken()
+	}
+	return stmt
+
+}
+
+// curTokenIs - assert a tokentype
 func (p *Parser) curTokenIs(t token.TokenType) bool {
 	return p.curToken.Type == t
 }
 
-// peek the next token
+// peekToken - peek the next token
 func (p *Parser) peekTokenIs(t token.TokenType) bool {
 	return p.peekToken.Type == t
 }
 
-// enforce correctness of the order of tokens (by checking what token comes next)
+// expectPeek - enforce correctness of the order of tokens (by checking what token comes next)
 func (p *Parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
