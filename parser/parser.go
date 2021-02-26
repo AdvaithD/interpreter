@@ -5,6 +5,7 @@ import (
 	"monkeylang/ast"
 	"monkeylang/lexer"
 	"monkeylang/token"
+	"strconv"
 )
 
 const (
@@ -50,6 +51,11 @@ func (p *Parser) registerInfix(tokenType token.TokenType, fn infixParseFn) {
 	p.infixParseFns[tokenType] = fn
 }
 
+func (p *Parser) noPrefixParseFnError(t token.TokenType) {
+	msg := fmt.Sprintf("no prefix parse function for %s found", t)
+	p.errors = append(p.errors, msg)
+}
+
 // New - create a new parser
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{l: l,
@@ -58,6 +64,9 @@ func New(l *lexer.Lexer) *Parser {
 	// intitialize prefixparse map and register identifier parser
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
 	p.registerPrefix(token.IDENT, p.parseIdentifier)
+	p.registerPrefix(token.INT, p.parseIntegerLiteral) // need tp register a prefix parser for token.INT tokens
+	p.registerPrefix(token.BANG, p.parsePrefixExpression)
+	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
 	// read two tokens - prepopulate curToken and peekToken
 	p.nextToken()
 	p.nextToken()
@@ -67,6 +76,16 @@ func New(l *lexer.Lexer) *Parser {
 // Errors - return errors in the parser
 func (p *Parser) Errors() []string {
 	return p.errors
+}
+
+// parsePrefixExperession - parse a prefix
+func (p *Parser) parsePrefixExpression() ast.Expression {
+	expression := &ast.PrefixExpression{Token: p.curToken, Operator: p.curToken.Literal}
+	p.nextToken()
+
+	expression.Right = p.parseExpression(PREFIX)
+	return expression
+
 }
 
 // parseIdentifier - retrieve the identifier in ast expression format
@@ -111,12 +130,15 @@ func (p *Parser) parseStatement() ast.Statement {
 func (p *Parser) parseExpression(precedence int) ast.Expression {
 	prefix := p.prefixParseFns[p.curToken.Type]
 	if prefix == nil {
+		p.noPrefixParseFnError(p.curToken.Type)
 		return nil
 	}
 	leftExp := prefix()
 
 	return leftExp
 }
+
+//
 
 // parseLetStatement - parse let statement
 func (p *Parser) parseLetStatement() *ast.LetStatement {
@@ -167,7 +189,22 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 		p.nextToken()
 	}
 	return stmt
+}
 
+// parseIntegerLiteral -
+func (p *Parser) parseIntegerLiteral() ast.Expression {
+	lit := &ast.IntegerLiteral{Token: p.curToken}
+
+	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
+
+	if err != nil {
+		msg := fmt.Sprintf("could not parse %q as integer", p.curToken.Literal)
+		p.errors = append(p.errors, msg)
+		return nil
+	}
+	lit.Value = value
+
+	return lit
 }
 
 // curTokenIs - assert a tokentype
