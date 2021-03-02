@@ -25,6 +25,13 @@ Takes in input data, and builds a data structure (AST in our case). The goal her
 - Builds child nodes, statements etc
 - parseExpression - recursive portion
 
+### Pratt Parsing - Top Down Operator Precedence
+
+- Each token type can have two parsing functions associated with it (infix or prefix)
+
+prefix e.g: `--5`
+infix e.g: `2 * 2`
+postfix e.g: `variableName++`
 #### Misc
 
 - The syntax consists of let statements, return statements and expressions. Pretty cool perspective to think from.

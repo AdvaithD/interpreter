@@ -8,8 +8,8 @@ import (
 // AST consists of interconnected nodes, forming a tree.
 
 type Node interface {
-	TokenLiteral() string // used for debugging
-	String() string
+	TokenLiteral() string
+	String() string // print ast nodes (for debugging purposes)
 }
 
 // Statement - do not produce values
@@ -30,13 +30,14 @@ type ReturnStatement struct {
 }
 
 type ExpressionStatement struct {
-	Token      token.Token
+	Token      token.Token // first token in expression
 	Expression Expression
 }
 
 func (es *ExpressionStatement) statementNode()       {}
 func (es *ExpressionStatement) TokenLiteral() string { return es.Token.Literal }
 
+// string method for expression statements
 func (es *ExpressionStatement) String() string {
 	if es.Expression != nil {
 		return es.Expression.String()
@@ -45,8 +46,7 @@ func (es *ExpressionStatement) String() string {
 	return ""
 }
 
-// PrefixExpression - prefixes have an operaor and an expression to the right
-// e.g:
+// PrefixExpression - prefixes have an operator and an expression to the right
 type PrefixExpression struct {
 	Token    token.Token
 	Operator string
@@ -55,6 +55,8 @@ type PrefixExpression struct {
 
 func (pe *PrefixExpression) expressionNode()      {}
 func (pe *PrefixExpression) TokenLiteral() string { return pe.Token.Literal }
+
+// string method for a prefix expression
 func (pe *PrefixExpression) String() string {
 	var out bytes.Buffer
 	out.WriteString("(")
@@ -65,9 +67,35 @@ func (pe *PrefixExpression) String() string {
 	return out.String()
 }
 
+type InfixExpression struct {
+	Token token.Token // infix operator
+	Left Expression
+	Operator string
+	Right Expression
+}
 func (rs *ReturnStatement) statementNode()       {}
+
+func (ie *InfixExpression) expressionNode() {}
+
+func (ie *InfixExpression) TokenLiteral() string {
+	return ie.Token.Literal
+}
+
+func (ie *InfixExpression) String() string {
+	var out bytes.Buffer
+
+	out.WriteString("(")
+	out.WriteString(ie.Left.String())
+	out.WriteString(" " + ie.Operator + " ")
+	out.WriteString(ie.Right.String())
+	out.WriteString(")")
+
+	return out.String()
+}
+
 func (rs *ReturnStatement) TokenLiteral() string { return rs.Token.Literal }
 
+// string method for return statement
 func (rs *ReturnStatement) String() string {
 	var out bytes.Buffer
 	out.WriteString(rs.TokenLiteral() + " ")
@@ -83,6 +111,7 @@ func (rs *ReturnStatement) String() string {
 func (ls *LetStatement) statementNode()       {}
 func (ls *LetStatement) TokenLiteral() string { return ls.Token.Literal }
 
+// string method for a let statement
 func (ls *LetStatement) String() string {
 	var out bytes.Buffer
 
@@ -138,6 +167,8 @@ func (p *Program) TokenLiteral() string {
 	}
 }
 
+// writes return value of each statements String() method
+// to a buffer, and returns the aggregate buffer in string format
 func (p *Program) String() string {
 	var out bytes.Buffer
 
