@@ -9,15 +9,30 @@ import (
 )
 
 const (
-	_ int = iota
-	LOWEST
-	EQUALS      // ==
-	LESSGREATER // > or <
-	SUM         // +
-	PRODUCT     // *
-	PREFIX      // -X or !X
-	CALL        // myFunction(X)
+	// use of iota gives the following constants incrementing values in ints
+	_ int = iota // 0
+	LOWEST       // 1
+	EQUALS       // ==
+	LESSGREATER  // > or <
+	SUM          // +
+	PRODUCT      // *
+	PREFIX       // -X or !X
+	CALL         // myFunction(X)
 )
+
+// precedences table
+// token type -> precedence
+// e.g: + and - have same precedence
+var precedences = map[token.TokenType]int{
+	token.EQ: EQUALS,
+	token.NOT_EQ: EQUALS,
+	token.LT: LESSGREATER,
+	token.GT: LESSGREATER,
+	token.PLUS: SUM,
+	token.MINUS: SUM,
+	token.SLASH: PRODUCT,
+	token.ASTERISK: PRODUCT,
+}
 
 // defined parser types with return type enforced
 type (
@@ -37,8 +52,24 @@ type Parser struct {
 	curToken  token.Token
 	peekToken token.Token
 
-	prefixParseFns map[token.TokenType]prefixParseFn // maps help if the right map has a parsing function associated with curToken.Type
-	infixParseFns  map[token.TokenType]infixParseFn
+	prefixParseFns map[token.TokenType]prefixParseFn // use curToken.Type to check if a prefix or infix parsing function exists
+	infixParseFns  map[token.TokenType]infixParseFn 
+}
+
+func (p *Parser) peekPrecedence() int {
+	if precedence, err := precedences[p.peekToken.Type]; err {
+		return precedence
+	}
+
+	return LOWEST
+}
+
+func (p *Parser) curPrecedence() int {
+	if precedence, ok := precedences[p.curToken.Type]; ok {
+		return precedence
+	}
+
+	return LOWEST
 }
 
 // register a prefix parse function
@@ -57,17 +88,33 @@ func (p *Parser) noPrefixParseFnError(t token.TokenType) {
 }
 
 // New - create a new parser
+// takes in lexer as an argument
 func New(l *lexer.Lexer) *Parser {
 	p := &Parser{l: l,
 		errors: []string{},
 	}
+
 	// intitialize prefixparse map and register identifier parser
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
+
+	// initialize prefixParse functions in the mapping
 	p.registerPrefix(token.IDENT, p.parseIdentifier)
 	p.registerPrefix(token.INT, p.parseIntegerLiteral) // need tp register a prefix parser for token.INT tokens
 	p.registerPrefix(token.BANG, p.parsePrefixExpression)
 	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
-	// read two tokens - prepopulate curToken and peekToken
+
+	// infix parsing!
+	p.infixParseFns = make(map[token.TokenType]infixParseFn)
+	p.registerInfix(token.PLUS, p.parseInfixExpression)
+	p.registerInfix(token.MINUS, p.parseInfixExpression)
+	p.registerInfix(token.SLASH, p.parseInfixExpression)
+	p.registerInfix(token.ASTERISK, p.parseInfixExpression)
+	p.registerInfix(token.EQ, p.parseInfixExpression)
+	p.registerInfix(token.NOT_EQ, p.parseInfixExpression)
+	p.registerInfix(token.LT, p.parseInfixExpression)
+	p.registerInfix(token.GT, p.parseInfixExpression)
+
+	// read two tokens - this ensures we've populated curToken and peekToken
 	p.nextToken()
 	p.nextToken()
 	return p
@@ -80,12 +127,33 @@ func (p *Parser) Errors() []string {
 
 // parsePrefixExperession - parse a prefix
 func (p *Parser) parsePrefixExpression() ast.Expression {
-	expression := &ast.PrefixExpression{Token: p.curToken, Operator: p.curToken.Literal}
+	expression := &ast.PrefixExpression{
+		Token: p.curToken,
+		Operator: p.curToken.Literal,
+	}
+	
 	p.nextToken()
 
 	expression.Right = p.parseExpression(PREFIX)
 	return expression
 
+}
+
+// parseInfixExpression - takes an expression for 'left'
+// which is used to construct an InfixExpression node, and to get the precedence,
+// after which the parser advances to the next roken (to fill *expression.Right)
+func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
+	expression := &ast.InfixExpression{
+		Token: p.curToken,
+		Operator: p.curToken.Literal,
+		Left: left,
+	}
+
+	precedence := p.curPrecedence()
+	p.nextToken()
+	expression.Right = p.parseExpression(precedence)
+
+	return expression
 }
 
 // parseIdentifier - retrieve the identifier in ast expression format
@@ -128,19 +196,35 @@ func (p *Parser) parseStatement() ast.Statement {
 
 // parseExpression - parse an expression, return AST expression
 func (p *Parser) parseExpression(precedence int) ast.Expression {
+	// prefix
 	prefix := p.prefixParseFns[p.curToken.Type]
+
 	if prefix == nil {
 		p.noPrefixParseFnError(p.curToken.Type)
 		return nil
 	}
-	leftExp := prefix()
 
-	return leftExp
+	leftExpression := prefix()
+
+	for !p.peekTokenIs(token.SEMICOLON) && precedence < p.peekPrecedence() {
+		infix := p.infixParseFns[p.peekToken.Type]
+		if infix == nil {
+			return leftExpression
+		}
+
+		p.nextToken()
+
+		leftExpression = infix(leftExpression)
+	}
+
+	return leftExpression
 }
 
-//
-
 // parseLetStatement - parse let statement
+// constructs *ast.LetStatement using the currentTooken
+// advances token by calling expectPeek()
+// after parsing the identifier, the parser expects
+// an '=' sign and a semicolon (token.ASSIGN and token.SEMICOLON)
 func (p *Parser) parseLetStatement() *ast.LetStatement {
 	// construct a let statement ast node
 	stmt := &ast.LetStatement{Token: p.curToken}
@@ -193,8 +277,9 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 
 // parseIntegerLiteral -
 func (p *Parser) parseIntegerLiteral() ast.Expression {
-	lit := &ast.IntegerLiteral{Token: p.curToken}
+	literal := &ast.IntegerLiteral{Token: p.curToken}
 
+	// convert string to int64
 	value, err := strconv.ParseInt(p.curToken.Literal, 0, 64)
 
 	if err != nil {
@@ -202,9 +287,9 @@ func (p *Parser) parseIntegerLiteral() ast.Expression {
 		p.errors = append(p.errors, msg)
 		return nil
 	}
-	lit.Value = value
+	literal.Value = value
 
-	return lit
+	return literal
 }
 
 // curTokenIs - assert a tokentype
@@ -218,6 +303,7 @@ func (p *Parser) peekTokenIs(t token.TokenType) bool {
 }
 
 // expectPeek - enforce correctness of the order of tokens (by checking what token comes next)
+// used across all of the parsing logic (e.g: check if let statement has - identifier, assignment and semicolon)
 func (p *Parser) expectPeek(t token.TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
