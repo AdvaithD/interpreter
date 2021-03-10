@@ -286,3 +286,105 @@ func TestParsingInfixExpressions(t *testing.T) {
 	}
 
 }
+
+func TestOperatorPrecedenceParsing(t *testing.T) {
+    tests := []struct {
+        input string
+        expected string
+    }{
+        {
+            "-a * b",
+            "((-a) * b)",
+        },
+        {
+            "!-a",
+            "(!(-a))",
+        },
+        {
+            "a + b + c",
+            "((a + b) + c)",
+        },
+        {
+            "a + b - c",
+            "((a + b) - c)",
+        },
+        {
+            "a * b * c",
+            "((a * b) * c)",
+        },
+        {
+            "a / b / c",
+            "((a / b) / c)",
+        },
+    }
+
+    for _, tt := range tests {
+        l := lexer.New(tt.input) // parse input into lexer
+        p := New(l) // create parser instance
+        program := p.ParseProgram()
+        checkParserErrors(t, p)
+        
+        actual := program.String()
+
+        if actual != tt.expected {
+            t.Errorf("expected=%q, got=%q", tt.expected, actual)
+        }
+    }
+}
+
+func testIdentifier(t *testing.T, exp ast.Expression, value string) bool {
+	ident, ok := exp.(*ast.Identifier)
+
+	if !ok {
+		t.Errorf("exp not of type ast.Identifier. Got = %T", exp)
+		return false
+	}
+
+	if ident.Value != value {
+		t.Errorf("ident.Value not %s. Got = %s", value, ident.Value)
+		return false
+	}
+
+	if ident.TokenLiteral() != value {
+		t.Errorf("ident.TokenLiteral not %s. got = %s", value, ident.TokenLiteral())
+		return false
+	}
+
+	return true
+}
+
+func testLiteralExpression(t *testing.T, exp ast.Expression, expected interface{}) bool {
+	switch v := expected.(type) {
+	case int:
+		return testIntegerLiteral(t, exp, int64(v))
+	case int64:
+		return testIntegerLiteral(t, exp, v)
+	case string:
+		return testIdentifier(t, exp, v)
+	}
+
+	t.Errorf("type of type = %T unable to be handled", exp)
+	return false
+}
+
+func testInfixEpxression(t *testing.T, exp ast.Expression, left interface{}, operator string, right interface{}) bool {
+	opExp, ok := exp.(*ast.InfixExpression) // cast as infix
+	if !ok {
+		t.Errorf("exp is not an ast.InfixExpression. got=%T(%s)", exp, exp)
+		return false
+	}
+	if !testLiteralExpression(t, opExp.Left, left) {
+		return false
+	}
+
+	if opExp.Operator != operator {
+		t.Errorf("exp.Operator is not '%s'. got=%q", operator, opExp.Operator)
+		return false
+	}
+
+	if !testLiteralExpression(t, opExp.Right, right) {
+		return false
+	}
+
+	return true
+}
