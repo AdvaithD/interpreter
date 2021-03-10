@@ -98,10 +98,12 @@ func New(l *lexer.Lexer) *Parser {
 	p.prefixParseFns = make(map[token.TokenType]prefixParseFn)
 
 	// initialize prefixParse functions in the mapping
-	p.registerPrefix(token.IDENT, p.parseIdentifier)
+	p.registerPrefix(token.IDENT, p.parseIdentifier) // identifier tokens (token.IDENT)
 	p.registerPrefix(token.INT, p.parseIntegerLiteral) // need tp register a prefix parser for token.INT tokens
-	p.registerPrefix(token.BANG, p.parsePrefixExpression)
-	p.registerPrefix(token.MINUS, p.parsePrefixExpression)
+	p.registerPrefix(token.BANG, p.parsePrefixExpression) // !
+	p.registerPrefix(token.MINUS, p.parsePrefixExpression) // -
+	p.registerPrefix(token.TRUE, p.parseBoolean)
+	p.registerPrefix(token.FALSE, p.parseBoolean)
 
 	// infix parsing!
 	p.infixParseFns = make(map[token.TokenType]infixParseFn)
@@ -151,6 +153,7 @@ func (p *Parser) parseInfixExpression(left ast.Expression) ast.Expression {
 
 	precedence := p.curPrecedence()
 	p.nextToken()
+
 	expression.Right = p.parseExpression(precedence)
 
 	return expression
@@ -273,6 +276,10 @@ func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
 		p.nextToken()
 	}
 	return stmt
+}
+
+func (p *Parser) parseBoolean() ast.Expression {
+	return &ast.Boolean{Token: p.curToken, Value: p.curTokenIs(token.TRUE)}
 }
 
 // parseIntegerLiteral -
