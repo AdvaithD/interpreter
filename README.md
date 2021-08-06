@@ -62,5 +62,5 @@ prefix e.g: `--5`
 infix e.g: `2 * 2`
 postfix e.g: `variableName++`
 #### **Misc**
+- **Things to do:** implement if statements, functions, boolean tests and boolean precedence tests, extending the REPL.
 
-- The syntax consists of let statements, return statements and expressions. Pretty cool perspective to think from.
